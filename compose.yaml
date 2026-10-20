@@ -31,7 +31,8 @@ services:
     ports:
       - "${APP_PORT:-8082}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   mongo-data:

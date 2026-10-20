@@ -4,6 +4,7 @@
   become: true
   vars:
     app_dir: /opt/tnsfrp
+    ansible_python_interpreter: /usr/bin/python3
     repository_url: https://github.com/karamsanth13/TNSFRP.git
     deploy_ref: main
     app_port: 8082
@@ -32,7 +33,7 @@
           - git
         state: present
         update_cache: true
-      when: ansible_os_family == 'Debian'
+      when: ansible_facts.os_family == 'Debian'
 
     - name: Ensure Docker is running
       ansible.builtin.service:
@@ -89,7 +90,7 @@
 
     - name: Wait for the frontend to answer
       ansible.builtin.uri:
-        url: "http://127.0.0.1:{{ app_port }}/login"
+        url: "http://127.0.0.1:{{ app_port }}/api/districts"
         status_code: 200
         return_content: false
       register: health
