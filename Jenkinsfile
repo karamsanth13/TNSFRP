@@ -7,6 +7,11 @@ pipeline {
         timeout(time: 40, unit: 'MINUTES')
     }
 
+    triggers {
+        pollSCM('*/5 * * * *')
+        cron('2-59/5 * * * *')
+    }
+
     parameters {
         booleanParam(name: 'DEPLOY_TO_HOST', defaultValue: false, description: 'Deploy main to the configured Ansible target')
         string(name: 'DEPLOY_HOST', defaultValue: '', description: 'Linux deployment host (required when deployment is enabled)')
