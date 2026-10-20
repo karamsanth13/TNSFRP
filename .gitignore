@@ -1,0 +1,24 @@
+# Build output and installed dependencies
+**/node_modules/
+**/dist/
+**/target/
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Deployment inventory and generated Jenkins inventory
+deploy/ansible/inventory.ini
+deploy/ansible/jenkins-inventory.ini
+
+# Local tooling
+.idea/
+.vscode/
+*.log
+*.iml
+Thumbs.db
+Desktop.ini

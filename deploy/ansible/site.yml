@@ -1,0 +1,98 @@
+---
+- name: Deploy TNSFRP with Docker Compose
+  hosts: all
+  become: true
+  vars:
+    app_dir: /opt/tnsfrp
+    repository_url: https://github.com/karamsanth13/TNSFRP.git
+    deploy_ref: main
+    app_port: 8082
+    public_host: "{{ lookup('env', 'TNSFRP_PUBLIC_HOST') | default('localhost', true) }}"
+    admin_name: System Admin
+    admin_email: "{{ lookup('env', 'TNSFRP_ADMIN_EMAIL') }}"
+    admin_password: "{{ lookup('env', 'TNSFRP_ADMIN_PASSWORD') }}"
+    cors_allowed_origins: "http://{{ public_host }}:{{ app_port }}"
+
+  pre_tasks:
+    - name: Require deployment credentials from the environment
+      ansible.builtin.assert:
+        that:
+          - admin_email | length > 0
+          - admin_password is match('^[A-Za-z0-9_-]{16,}$')
+          - admin_password != 'REPLACE_WITH_A_LONG_RANDOM_PASSWORD'
+        fail_msg: Set TNSFRP_ADMIN_EMAIL and a unique TNSFRP_ADMIN_PASSWORD (16+ letters, digits, underscores, or hyphens).
+      no_log: true
+
+  tasks:
+    - name: Install Docker, Compose, and Git on Debian hosts
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - git
+        state: present
+        update_cache: true
+      when: ansible_os_family == 'Debian'
+
+    - name: Ensure Docker is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create deployment directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0750"
+
+    - name: Checkout the selected Git revision
+      ansible.builtin.git:
+        repo: "{{ repository_url }}"
+        dest: "{{ app_dir }}"
+        version: "{{ deploy_ref }}"
+        update: true
+      register: checkout
+
+    - name: Write deployment environment file
+      ansible.builtin.copy:
+        dest: "{{ app_dir }}/.env"
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          ADMIN_NAME={{ admin_name }}
+          ADMIN_EMAIL={{ admin_email }}
+          ADMIN_PASSWORD={{ admin_password }}
+          APP_PORT={{ app_port }}
+          CORS_ALLOWED_ORIGINS={{ cors_allowed_origins }}
+      no_log: true
+
+    - name: Ensure deployment source is readable for the Docker build
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Build and start the application
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - "{{ app_dir }}"
+          - up
+          - --build
+          - --detach
+          - --remove-orphans
+      changed_when: true
+
+    - name: Wait for the frontend to answer
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ app_port }}/login"
+        status_code: 200
+        return_content: false
+      register: health
+      retries: 30
+      delay: 5
+      until: health.status == 200
